@@ -35,7 +35,7 @@ async function bootstrap() {
   );
 
   const options = new DocumentBuilder()
-    .setTitle('Bolle Consulting Backend API')
+    .setTitle('ElectronMon Backend API')
     .setDescription('')
     .setVersion('1.0')
     .addBearerAuth()
