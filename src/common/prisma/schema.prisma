@@ -1,0 +1,118 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  phoneNumber  String? @unique
+  email        String  @unique
+  password     String
+  isActive     Boolean @default(false)
+  authStrategy String?
+  role         String  @default("user")
+
+  firstName  String
+  lastName   String
+  otherNames String?
+  country    String   @default("nigeria")
+
+  createdByUserId   String?
+
+  @@map("user")
+}
+
+model State {
+  id     String   @id @default(uuid())
+  name   String
+  code   String   @unique
+  lgas   LocalGovernment[]
+  
+  @@unique([name])
+}
+model LocalGovernment {
+  id       String   @id @default(uuid())
+  name     String
+  stateId  String
+  state    State    @relation(fields: [stateId], references: [id])
+  wards    Ward[]
+
+
+  @@unique([name, stateId])
+}
+
+model Ward {
+  id      String   @id @default(uuid())
+  name    String
+  lgaId   String
+  lga     LocalGovernment @relation(fields: [lgaId], references: [id])
+  pollingUnits PollingUnit[]
+  
+}
+model PollingUnit {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  address   String?
+  latitude  Float?
+  longitude Float?
+  isActive  Boolean  @default(true)
+  wardId    String
+  ward      Ward     @relation(fields: [wardId], references: [id])
+  results   Result[]
+  incidents IncidentReport[]
+}
+
+model Election {
+  id      String   @id @default(uuid())
+  name    String
+  type    String
+  date    DateTime
+  status  String @default("upcoming")
+  results Result[]
+}
+
+model Result {
+  id             String   @id @default(uuid())
+  pollingUnitId  String
+  electionId     String
+  partyCode      String
+  votes          Int
+  timestamp      DateTime @default(now())
+
+  pollingUnit    PollingUnit @relation(fields: [pollingUnitId], references: [id])
+  election       Election    @relation(fields: [electionId], references: [id])
+}
+
+model IncidentReport {
+  id             String   @id @default(uuid())
+  pollingUnitId  String
+  reporterName   String
+  description    String
+  severity       String
+  status         String
+  createdAt      DateTime @default(now())
+
+  pollingUnit    PollingUnit @relation(fields: [pollingUnitId], references: [id])
+}
+
+model PasswordResetToken {
+  email     String
+  token     String   @id
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+model BlacklistedToken {
+  token     String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
