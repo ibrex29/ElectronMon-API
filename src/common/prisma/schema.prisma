@@ -8,6 +8,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  CONSTITUENCY_HEAD
+  WARD_HEAD
+  PU_HEAD
+}
+
 model User {
   id        String    @id @default(uuid())
   createdAt DateTime  @default(now())
@@ -19,90 +26,128 @@ model User {
   password     String
   isActive     Boolean @default(false)
   authStrategy String?
-  role         String  @default("user")
+  role         Role
 
   firstName  String
   lastName   String
   otherNames String?
-  country    String   @default("nigeria")
+  country    String  @default("nigeria")
 
-  createdByUserId   String?
+  createdByUserId String?
+  puUnitId        String?
+
+  constituenciesLed Constituency[] @relation("UserConstituencyHead")
+  wardsLed          Ward[]         @relation("UserWardHead")
+  pollingUnitsLed   PollingUnit[]  @relation("UserPUHead")
+  resultsUploaded   Result[]
+  issuesReported    IssueReport[]
+  Result            Result[]       @relation("UserResults")
+  IssueReport       IssueReport[]  @relation("UserIssues")
 
   @@map("user")
 }
 
 model State {
-  id     String   @id @default(uuid())
-  name   String
-  code   String   @unique
-  lgas   LocalGovernment[]
-  
+  id   String @id @default(uuid())
+  name String
+  code String @unique
+
+  lgas            LocalGovernment[]
+  LocalGovernment LocalGovernment[] @relation("StateLGAs")
+
   @@unique([name])
 }
-model LocalGovernment {
-  id       String   @id @default(uuid())
-  name     String
-  stateId  String
-  state    State    @relation(fields: [stateId], references: [id])
-  wards    Ward[]
 
+model LocalGovernment {
+  id      String @id @default(uuid())
+  name    String
+  stateId String
+
+  state State   @relation("StateLGAs", fields: [stateId], references: [id])
+  wards Ward[]  @relation("LGAWards")
+  State State[]
 
   @@unique([name, stateId])
 }
 
-model Ward {
-  id      String   @id @default(uuid())
-  name    String
-  lgaId   String
-  lga     LocalGovernment @relation(fields: [lgaId], references: [id])
-  pollingUnits PollingUnit[]
-  
-}
-model PollingUnit {
+model Constituency {
   id        String   @id @default(uuid())
   name      String
-  code      String   @unique
-  address   String?
-  latitude  Float?
-  longitude Float?
-  isActive  Boolean  @default(true)
-  wardId    String
-  ward      Ward     @relation(fields: [wardId], references: [id])
-  results   Result[]
-  incidents IncidentReport[]
+  headId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  head  User   @relation("UserConstituencyHead", fields: [headId], references: [id])
+  wards Ward[] @relation("ConstituencyWards")
 }
 
-model Election {
-  id      String   @id @default(uuid())
-  name    String
-  type    String
-  date    DateTime
-  status  String @default("upcoming")
+model Ward {
+  id             String   @id @default(uuid())
+  name           String
+  constituencyId String
+  headId         String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  constituency     Constituency      @relation("ConstituencyWards", fields: [constituencyId], references: [id])
+  head             User              @relation("UserWardHead", fields: [headId], references: [id])
+  pollingUnits     PollingUnit[]     @relation("WardPollingUnits")
+  localGovernments LocalGovernment[] @relation("LGAWards")
+}
+
+model PollingUnit {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  status    String
+  wardId    String
+  headId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ward Ward @relation("WardPollingUnits", fields: [wardId], references: [id])
+  head User @relation("UserPUHead", fields: [headId], references: [id])
+
   results Result[]
+  issues  IssueReport[]
+
+  Result Result[] @relation("PollingUnitResults")
+
+  IssueReport IssueReport[] @relation("PollingUnitIssues")
 }
 
 model Result {
-  id             String   @id @default(uuid())
-  pollingUnitId  String
-  electionId     String
-  partyCode      String
-  votes          Int
-  timestamp      DateTime @default(now())
+  id            String   @id @default(uuid())
+  pollingUnitId String
+  uploadedBy    String
+  imageUrl      String
+  status        String
+  notes         String?
+  createdAt     DateTime @default(now())
 
-  pollingUnit    PollingUnit @relation(fields: [pollingUnitId], references: [id])
-  election       Election    @relation(fields: [electionId], references: [id])
+  pollingUnit PollingUnit @relation("PollingUnitResults", fields: [pollingUnitId], references: [id])
+  uploader    User        @relation("UserResults", fields: [uploadedBy], references: [id])
+
+  PollingUnit PollingUnit[]
+
+  User User[]
 }
 
-model IncidentReport {
-  id             String   @id @default(uuid())
-  pollingUnitId  String
-  reporterName   String
-  description    String
-  severity       String
-  status         String
-  createdAt      DateTime @default(now())
+model IssueReport {
+  id            String   @id @default(uuid())
+  pollingUnitId String
+  reportedBy    String
+  type          String
+  description   String
+  status        String
+  imageUrl      String?
+  isUrgent      Boolean  @default(false)
+  createdAt     DateTime @default(now())
 
-  pollingUnit    PollingUnit @relation(fields: [pollingUnitId], references: [id])
+  pollingUnit PollingUnit   @relation("PollingUnitIssues", fields: [pollingUnitId], references: [id])
+  reporter    User          @relation("UserIssues", fields: [reportedBy], references: [id])
+  PollingUnit PollingUnit[]
+  User        User[]
 }
 
 model PasswordResetToken {
@@ -111,8 +156,9 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
   expiresAt DateTime
 }
+
 model BlacklistedToken {
   token     String   @id
-  expiresAt DateTime
   createdAt DateTime @default(now())
+  expiresAt DateTime
 }

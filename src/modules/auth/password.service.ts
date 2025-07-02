@@ -7,8 +7,6 @@ import { ConfigService } from '@nestjs/config';
 import { SITE_URL } from '@/common/constants';
 import { UserService } from '../user/user.service';
 import { UserNotFoundException } from '../user/exceptions/UserNotFound.exception';
-import { MailService } from '../mail/mail.service';
-import { EmailTemplates } from '../mail/templates/template.enum';
 
 @Injectable()
 export class PasswordService {
@@ -19,17 +17,13 @@ export class PasswordService {
     private userService: UserService,
     private cryptoService: CryptoService,
     private prisma: PrismaService,
-    private mailService: MailService,
-  ) {
+  ) // private mailService: MailService,
+  {
     this.siteUrl = this.configService.get(SITE_URL);
   }
 
-  async isResetTokenValid(
-    passwordResetToken: string,
-  ): Promise<boolean> {
-    const isValidToken = await this.validateResetToken(
-      passwordResetToken,
-    );
+  async isResetTokenValid(passwordResetToken: string): Promise<boolean> {
+    const isValidToken = await this.validateResetToken(passwordResetToken);
     return !!isValidToken;
   }
 
@@ -59,26 +53,28 @@ export class PasswordService {
 
   async requestPasswordReset(email: string): Promise<string> {
     const user = await this.userService.findUserByEmail(email);
-  
+
     if (!user) {
       throw new UserNotFoundException();
     }
-  
+
     const passwordResetToken = await this.generateSecureToken();
     await this.saveResetToken(user.email, passwordResetToken);
-  
-    const resetUrl = `${this.configService.getOrThrow('FRONTEND_URL')}/reset-password?token=${passwordResetToken}`;
-  
-    await this.mailService.sendTemplateEmail(
-      EmailTemplates.PASSWORD_RESET,
-      user.email,
-      user.firstName,
-      { reset_url: resetUrl, user: user.firstName }
-    );
-  
+
+    const resetUrl = `${this.configService.getOrThrow(
+      'FRONTEND_URL',
+    )}/reset-password?token=${passwordResetToken}`;
+
+    // await this.mailService.sendTemplateEmail(
+    //   EmailTemplates.PASSWORD_RESET,
+    //   user.email,
+    //   user.firstName,
+    //   { reset_url: resetUrl, user: user.firstName }
+    // );
+
     return passwordResetToken;
   }
-  
+
   async resetPasswordWithToken(
     email: string,
     passwordResetToken: string,
@@ -90,9 +86,7 @@ export class PasswordService {
       throw new UserNotFoundException();
     }
 
-    const isValidToken = await this.validateResetToken(
-      passwordResetToken,
-    );
+    const isValidToken = await this.validateResetToken(passwordResetToken);
 
     if (!isValidToken) {
       throw new InvalidResetTokenException();
@@ -110,7 +104,10 @@ export class PasswordService {
     await this.invalidateResetToken(email);
   }
 
-  private async saveResetToken(email: string, passwordResetToken: string): Promise<void> {
+  private async saveResetToken(
+    email: string,
+    passwordResetToken: string,
+  ): Promise<void> {
     const expiresAt = new Date(Date.now() + 60 * 60 * 24 * 1000); // 24 hours from now
     await this.prisma.passwordResetToken.create({
       data: {
@@ -119,10 +116,15 @@ export class PasswordService {
         expiresAt,
       },
     });
-    Logger.log(passwordResetToken, `saveResetToken - passwordResetToken:${email}`);
+    Logger.log(
+      passwordResetToken,
+      `saveResetToken - passwordResetToken:${email}`,
+    );
   }
-  
-  private async validateResetToken(passwordResetToken: string): Promise<boolean> {
+
+  private async validateResetToken(
+    passwordResetToken: string,
+  ): Promise<boolean> {
     const tokenRecord = await this.prisma.passwordResetToken.findFirst({
       where: {
         token: passwordResetToken,
@@ -131,15 +133,18 @@ export class PasswordService {
         },
       },
     });
-  
+
     if (!tokenRecord) {
-      return false; 
+      return false;
     }
-  
-    Logger.log(`Valid token for email: ${tokenRecord.email}`, `validateResetToken`);
+
+    Logger.log(
+      `Valid token for email: ${tokenRecord.email}`,
+      `validateResetToken`,
+    );
     return true;
-  }  
-  
+  }
+
   private async invalidateResetToken(email: string): Promise<void> {
     await this.prisma.passwordResetToken.deleteMany({
       where: { email },

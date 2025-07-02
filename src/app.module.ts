@@ -12,12 +12,11 @@ import { PrismaModule } from './common/prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HttpModule } from '@nestjs/axios';
 import { UserModule } from './modules/user/user.module';
-import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      cache: true, 
+      cache: true,
       envFilePath: ['docker.env', '.env'],
       isGlobal: true,
     }),
@@ -30,8 +29,8 @@ import { MailModule } from './modules/mail/mail.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => [
         {
-          ttl: seconds(configService.get(THROTTLE_TTL) || 10), 
-          limit: configService.get(THROTTLE_LIMIT) || 20, 
+          ttl: seconds(configService.get(THROTTLE_TTL) || 10),
+          limit: configService.get(THROTTLE_LIMIT) || 20,
         },
       ],
     }),
@@ -46,7 +45,6 @@ import { MailModule } from './modules/mail/mail.module';
     PrismaModule,
     UserModule,
     AuthModule,
-    MailModule
   ],
 })
 export class AppModule {}
